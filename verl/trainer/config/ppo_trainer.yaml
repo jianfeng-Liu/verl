@@ -251,6 +251,7 @@ algorithm:
     easy_count: 4
     medium_count: 6
     hard_count: 8
+    very_hard_count: 8
 
 trainer:
   balance_batch: True

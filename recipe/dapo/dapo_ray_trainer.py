@@ -166,9 +166,8 @@ class RayDAPOTrainer(RayPPOTrainer):
                             metrics.update(kl_metrics)  # TODO: This will be cleared if we use multiple genenration batches
                         else:
                             new_batch.batch["token_level_rewards"] = new_batch.batch["token_level_scores"]
-                    if self.config.algorithm.filter_samples:
+                    if self.config.algorithm.filter_samples.enable:
                         new_batch.batch["response_mask"] = compute_response_mask(new_batch)
-                        print('metric_name:',self.config.algorithm.filter_groups.metric)
                         filtering_sampling_kept_traj_idxs = filtering_sampling(new_batch,
                                                                                metric=self.config.algorithm.filter_sample.metric,
                                                                                metric_name=self.config.algorithm.filter_groups.metric,
@@ -178,7 +177,7 @@ class RayDAPOTrainer(RayPPOTrainer):
                                                                                easy_count=self.config.algorithm.filter_sample.easy_count,
                                                                                medium_count=self.config.algorithm.filter_sample.medium_count,
                                                                                hard_count=self.config.algorithm.filter_sample.hard_count,
-                                                                               very_hard_count=self.config.algorithm.filter_sample.hard_count,
+                                                                               very_hard_count=self.config.algorithm.filter_sample.very_hard_count,
                                                                                )
                         new_batch = new_batch[filtering_sampling_kept_traj_idxs]
                     if not self.config.algorithm.filter_groups.enable:
@@ -272,7 +271,7 @@ class RayDAPOTrainer(RayPPOTrainer):
                                 rollout_probs_diff = torch.masked_select(rollout_probs_diff, response_mask.bool())
                                 rollout_probs_diff_max = torch.max(rollout_probs_diff)
                                 rollout_probs_diff_min = torch.min(rollout_probs_diff)
-                                rollout_probs_diff = torch.aba(rollout_probs_diff)
+                                rollout_probs_diff = torch.abs(rollout_probs_diff)
                                 rollout_probs_diff_mean = torch.mean(rollout_probs_diff)
                                 rollout_probs_diff_std = torch.std(rollout_probs_diff)
                                 metrics.update(

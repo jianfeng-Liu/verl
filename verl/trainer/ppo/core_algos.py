@@ -24,7 +24,7 @@ import numpy as np
 import torch
 
 import verl.utils.torch_functional as verl_F
-
+import statistics
 
 class AdaptiveKLController:
     """
@@ -492,6 +492,11 @@ def compute_policy_loss(
             Defaults to 3.0.
         loss_agg_mode (str, optional):
             Aggregation mode for `agg_loss`. Defaults to "token-mean".
+        tis_imp_ratio_cap (float, optional):
+            Maximum cap for the temporal importance sampling ratio in Truncated Importance Sampling (TIS)
+            See https://fengyao.notion.site/off-policy-rl.
+            Mitigates performance degradation from distribution gaps between rollout generation (e.g., vLLM) and model training (e.g., FSDP) in modern RL frameworks.
+            Defaults to -1 (TIS disabled).
     """
     assert clip_ratio_c > 1.0, "The lower bound of the clip_ratio_c for dual-clip PPO should be greater than 1.0," + f" but get the value: {clip_ratio_c}."
 
@@ -513,8 +518,8 @@ def compute_policy_loss(
     pg_clipfrac_lower = verl_F.masked_mean(torch.gt(clip_pg_losses1, pg_losses3) * (advantages < 0).float(), response_mask)
 
     pg_losses = torch.where(advantages < 0, clip_pg_losses2, clip_pg_losses1)
+
     if tis_imp_ratio_cap > 0 and rollout_log_probs is not None:
-        print("tis_imp_ratio_cap:", tis_imp_ratio_cap)
         tis_imp_ratio = torch.exp(old_log_prob - rollout_log_probs)
         tis_imp_ratio = torch.clamp(tis_imp_ratio, max=tis_imp_ratio_cap)
         pg_losses = pg_losses * tis_imp_ratio
@@ -706,7 +711,7 @@ def compute_scores(data, metric = "response length", metric_name = "seq_final_re
         elif metric_name == "seq_reward":
             reward_value = data.batch["token_level_scores"].sum(dim=-1).numpy()
         else:
-            reward_value = data.batch["token_level_scores"].sum(dim=-1).numpy()
+            raise NotImplementedError(f"Unsupported metric_name: {metric_name}")
     if metric == "response length":
         for i in range(bsz):
             id2response_and_score[index[i]].append((i, response_length[i]))
@@ -724,7 +729,6 @@ def compute_scores(data, metric = "response length", metric_name = "seq_final_re
         id2reward = defaultdict(list)
         for i in range(bsz):
             id2reward[index[i]].append(reward_value[i])
-        import statistics
         for id in id2reward:
             id2average_reward[id] = statistics.mean(id2reward[id])
 
@@ -747,7 +751,6 @@ def filtering_sampling(data, metric = "response length", metric_name = "seq_fina
     Returns:
         kept_traj_idxs: the desirable responses to train on.
     """
-    print("filtering_sampling starting")
     id2response_and_score, id2average_reward = compute_scores(data, metric, adaptive, metric_name)
     kept_traj_idxs = []
     if adaptive:
@@ -766,11 +769,11 @@ def filtering_sampling(data, metric = "response length", metric_name = "seq_fina
                 count = medium_count
             else:
                 count = easy_count
-            for i in range(count):
+            for i in range(min(count, len(id_score))):
                 kept_traj_idxs.append(id_score[i][0])
     else:
         for id in id2response_and_score.keys():
-            for i in range(retain_count):
-                id_score = id2response_and_score[id]
+            id_score = id2response_and_score[id]
+            for i in range(min(retain_count, len(id_score[i]))):
                 kept_traj_idxs.append(id_score[i][0])
     return kept_traj_idxs
