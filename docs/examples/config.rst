@@ -114,7 +114,6 @@ Actor/Rollout/Reference Policy
       clip_ratio: 0.2
       entropy_coeff: 0.0
       use_kl_loss: False # True for GRPO
-      tis_imp_ratio_cap: -1
       use_torch_compile: True # False to disable torch compile
       kl_loss_coef: 0.001 # for grpo
       kl_loss_type: low_var_kl # for grpo
@@ -180,7 +179,6 @@ Actor/Rollout/Reference Policy
           attention_backend: null # null means use the engine default value, available options: flashinfer, triton, flashmla
 
       n: 1 # for each prompt, sample n responses (i.e. num sample times). set it to values > 1 for grpo, rloo
-      calculate_log_probs: False
 val_kwargs:
         # sampling parameters for validation
         top_k: -1 # 0 for hf rollout, -1 for vllm rollout
